@@ -26,7 +26,7 @@ IF NOT Exists (SELECT * FROM sys.columns where object_id = OBJECT_ID(N'dbo.yaf_M
 GO
 
 /* Specify your original moduleID here:               */
-DECLARE @oModuleID int = 504;
+DECLARE @oModuleID int = -1;
 /*                       ^ replace with your ModuleID */
 /* -------------------------------------------------- */
 /* modify the following id's to match the board,
