@@ -26,7 +26,7 @@ IF NOT Exists (SELECT * FROM sys.columns where object_id = OBJECT_ID(N'dbo.yaf_M
 GO
 
 /* Specify your original moduleID here:               */
-DECLARE @oModuleID int = -1;
+DECLARE @oModuleID int = 504;
 /*                       ^ replace with your ModuleID */
 /* -------------------------------------------------- */
 /* modify the following id's to match the board,
@@ -192,10 +192,10 @@ BEGIN TRY
 		  LEFT JOIN dbo.UserProfile               CY ON U.UserID  = BD.UserID  AND BD.PropertyDefinitionID = @BDPropertyID
 		  LEFT JOIN dbo.UserProfile               WS ON U.UserID  = WS.UserID  AND WS.PropertyDefinitionID = @WSPropertyID
 		)
-        MERGE INTO dbo.yaf_userProfile T
+        MERGE INTO dbo.yaf_prov_Profile T
 		USING xProfile S ON T.UserID = S.UserID
-		WHEN NOT MATCHED THEN INSERT (  UserID,   LastUpdatedDate,   LastActivity, ApplicationName, IsAnonymous, UserName,  Gender,   Blog,      RealName, Interests, Skype, Facebook, Location, BlogServiceUrl,   Birthday, LastSyncedWithDNN, ICQ,   City, MSN, TwitterId, Twitter, BlogServicePassword,   Country, Occupation,   Region, AIM, XMPP, YIM, Google, BlogServiceUsername, GoogleId,  Homepage, FacebookId)
-							  VALUES (S.UserID, S.LastUpdatedDate, S.LastActivity,   N'DotNetNuke',           0, S.Username,     0,    N'', S.DisplayName,       N'',   N'',      N'',      N'',            N'', S.Birthday,              Null, N'', S.City, N'',      Null,     N'',                 N'', S.Country,        N'', S.Region, N'',  N'', N'',    N'',                 N'',     Null, S.Website,       Null);
+		WHEN NOT MATCHED THEN INSERT (  UserID,   LastUpdatedDate,  Gender,   Blog,      RealName, Interests, Skype, Facebook, Location, BlogServiceUrl,   Birthday, LastSyncedWithDNN, ICQ,   City, MSN, TwitterId, Twitter, BlogServicePassword,   Country, Occupation,   Region, AIM, XMPP, YIM, Google, BlogServiceUsername, GoogleId,  Homepage, FacebookId)
+							  VALUES (S.UserID, S.LastUpdatedDate, 0,    N'', S.DisplayName,       N'',   N'',      N'',      N'',            N'', S.Birthday,              Null, N'', S.City, N'',      Null,     N'',                 N'', S.Country,        N'', S.Region, N'',  N'', N'',    N'',                 N'',     Null, S.Website,       Null);
 
 	PRINT N'Add Guests Membership for Guest User;';
 	With S AS
@@ -203,19 +203,19 @@ BEGIN TRY
 				G.GroupID
 		  FROM  dbo.yaf_Group G
 		  JOIN  dbo.yaf_User  Y ON Y.Name = N'Guest' AND Y.BoardID  = G.BoardID AND G.Flags = 2
-		  WHERE G.BoardID  = @BoardID 
+		  WHERE G.BoardID  = @BoardID
 		)
 		MERGE INTO dbo.yaf_userGroup T
 		USING S ON T.UserID = S.UserID and T.GroupID = S.GroupID
 		WHEN NOT MATCHED THEN INSERT (UserID, GroupID) VALUES (S.UserID, S.GroupID);
-	
+
 	PRINT N'Add All users to Registered Group;';
 	With S AS
 		(SELECT Y.UserID,
 				G.GroupID
 		  FROM  dbo.yaf_Group G
 		  JOIN  dbo.yaf_User  Y ON Y.Name != N'Guest' AND Y.BoardID  = G.BoardID AND G.Flags = 4
-		  WHERE G.BoardID  = @BoardID 
+		  WHERE G.BoardID  = @BoardID
 		)
 		MERGE INTO dbo.yaf_userGroup T
 		USING S ON T.UserID = S.UserID and T.GroupID = S.GroupID
@@ -250,16 +250,16 @@ BEGIN TRY
 
 	PRINT N'Raise Access Mask for Administrators:';
 	MERGE INTO dbo.yaf_User T
-	USING (SELECT UserID 
+	USING (SELECT UserID
 			FROM  dbo.yaf_UserGroup R
-			JOIN  dbo.yaf_Group     G ON R.GroupID = G.GroupID 
+			JOIN  dbo.yaf_Group     G ON R.GroupID = G.GroupID
 			WHERE G.Flags = 1 AND G.BoardID = @BoardID
 		   ) S ON T.UserID = S.UserID
 	WHEN MATCHED AND T.Flags != 98 THEN UPDATE SET FLAGS = 98;
 
 	PRINT N'Raise Access Mask for Superusers:';
 	MERGE INTO dbo.yaf_User T
-	USING (SELECT R.UserID 
+	USING (SELECT R.UserID
 			FROM  dbo.yaf_UserGroup R
 			JOIN  dbo.yaf_Group     G ON R.GroupID = G.GroupID
 			JOIN  dbo.yaf_user      Y ON R.UserID = Y.UserID
@@ -270,8 +270,8 @@ BEGIN TRY
 
 	Print 'Populate aspnet_usersInRoles:';
 	MERGE INTO dbo.aspnet_usersInRoles T
-	USING (SELECT U.ProviderUserKey AS UserId, 
-	              R.RoleID 
+	USING (SELECT U.ProviderUserKey AS UserId,
+	              R.RoleID
 	        FROM  dbo.yaf_UserGroup  Y
 			JOIN  dbo.yaf_Group      G ON Y.GroupID = G.GroupID
 	        JOIN  dbo.aspnet_Roles   R ON G.Name = R.RoleName AND G.BoardID = @BoardID
@@ -323,7 +323,7 @@ BEGIN TRY
 	MERGE INTO dbo.yaf_topic T
 	USING (SELECT T.*,
 	              CASE T.StatusID WHEN 0 THEN N'INFORMATIC' WHEN 1 THEN N'QUESTION' WHEN 3 THEN N'SOLVED' ELSE N'' END AS YState,
-				    CASE WHEN T.isDeleted = 1 THEN    8 ELSE 0 END 
+				    CASE WHEN T.isDeleted = 1 THEN    8 ELSE 0 END
 				  + CASE WHEN T.IsLocked  = 1 THEN    1 ELSE 0 END
 				  + CASE WHEN T.IsPinned  = 1 THEN    0 ELSE 0 END -- no equivalent?
 				  + CASE WHEN T.StatusID  = 1 THEN 1024 ELSE 0 END AS YFlags,
@@ -476,7 +476,7 @@ BEGIN TRY
 	-- Copy group & forum permission // skipped due to incompatible Permission format, please set manually
 	-- AF Stores each permission for each forum and group as String of format N'0;13;|1134;||'
 	-- | is delimiter for main parts:  RoleIDs Granted | UserIDs granted | SocialGroupID Owners granted | ?
-	-- each part is a list of id's delimited by ; or :   
+	-- each part is a list of id's delimited by ; or :
 
 	Print N'Resynchronize Board Info:';
 	Exec dbo.[yaf_forum_resync] @BoardID;
